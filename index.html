@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>AR Quest 3D - Modo Juego con Controles y Colisiones</title>
+
+  <!-- Fuente Google Fonts 'Poppins' -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- A-Frame y AR.js -->
+  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.7/aframe/build/aframe-ar.js"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html, body {
+      margin: 0 !important;
+      padding: 0 !important;
+      width: 100% !important;
+      height: 100% !important;
+      overflow: hidden !important;
+      background: transparent !important;
+      font-family: 'Poppins', sans-serif;
+      color: #FFFFFF;
+    }
+
+    .a-canvas {
+      position: absolute !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100% !important;
+      height: 100% !important;
+      z-index: 1 !important;
+    }
+
+    /* HUD Glassmorphism */
+    #hud {
+      position: fixed;
+      top: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: calc(100% - 24px);
+      max-width: 480px;
+      z-index: 100;
+      background: rgba(12, 17, 30, 0.78);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 16px;
+      padding: 12px 14px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .hud-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .hud-title {
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 0.8px;
+      background: linear-gradient(135deg, #FFF, #00FFF5);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    #reiniciar {
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #FFF;
+      padding: 5px 12px;
+      border-radius: 99px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      transition: 0.2s;
+    }
+    #reiniciar:hover { background: rgba(255, 255, 255, 0.25); }
+
+    .hud-stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+      text-align: center;
+    }
+
+    .stat-card {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      padding: 6px 2px;
+    }
+
+    .stat-label {
+      font-size: 10px;
+      color: #94A3B8;
+      display: block;
+    }
+
+    .stat-val {
+      font-size: 14px;
+      font-weight: 700;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
+    }
+    .c-cyan { color: #00FFF5; }
+    .c-gold { color: #FFD700; }
+    .c-red { color: #FF3366; animation: blink 1s infinite; }
+    @keyframes blink { 50% { opacity: 0.5; } }
+
+    .progress-bar {
+      height: 5px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #00FFF5, #FFD700);
+      transition: width 0.3s;
+    }
+
+    /* CONTROLES TÁCTILES (DPAD) */
+    #controles-dpad {
+      position: fixed;
+      bottom: 25px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 200;
+      display: grid;
+      grid-template-columns: repeat(3, 55px);
+      grid-template-rows: repeat(2, 55px);
+      gap: 8px;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .btn-ctrl {
+      background: rgba(12, 17, 30, 0.85);
+      border: 1px solid rgba(0, 255, 245, 0.4);
+      color: #00FFF5;
+      font-size: 20px;
+      font-weight: bold;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+      touch-action: manipulation;
+    }
+    .btn-ctrl:active {
+      background: rgba(0, 255, 245, 0.4);
+      color: #FFF;
+      transform: scale(0.92);
+    }
+    #btn-up { grid-column: 2; grid-row: 1; }
+    #btn-left { grid-column: 1; grid-row: 2; }
+    #btn-down { grid-column: 2; grid-row: 2; }
+    #btn-right { grid-column: 3; grid-row: 2; }
+
+    /* Feedback visual */
+    #damage-flash {
+      position: fixed;
+      inset: 0;
+      background: rgba(255, 23, 68, 0.45);
+      z-index: 90;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.1s;
+    }
+    #damage-flash.active { opacity: 1; }
+
+    #feedback {
+      position: fixed;
+      top: 40%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 95;
+      font-size: 28px;
+      font-weight: 800;
+      pointer-events: none;
+      opacity: 0;
+      transition: 0.3s;
+    }
+
+    #toast {
+      position: fixed;
+      top: 96px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 105;
+      background: rgba(10, 15, 30, 0.95);
+      border: 1px solid #00FFF5;
+      padding: 8px 18px;
+      border-radius: 99px;
+      font-size: 13px;
+      font-weight: 700;
+      box-shadow: 0 0 20px rgba(0, 255, 245, 0.4);
+      opacity: 0;
+      pointer-events: none;
+      transition: 0.3s;
+    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(5px); }
+
+    /* Modales de Victoria y Derrota */
+    .modal {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      background: rgba(5, 8, 20, 0.9);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .modal-box {
+      background: rgba(18, 24, 43, 0.98);
+      border: 1px solid rgba(255, 215, 0, 0.4);
+      border-radius: 20px;
+      padding: 24px;
+      max-width: 360px;
+      width: 100%;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
+    }
+
+    .modal-btn {
+      background: linear-gradient(135deg, #FFB300, #F59E0B);
+      color: #000;
+      border: none;
+      border-radius: 99px;
+      padding: 10px 24px;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      width: 100%;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Archivos de Audio Locales -->
+  <audio id="audio-coin" src="moneda.mp3" preload="auto"></audio>
+  <audio id="audio-damage" src="enemigo.mp3" preload="auto"></audio>
+  <audio id="audio-win" src="victoria.mp3" preload="auto"></audio>
+
+  <div id="damage-flash"></div>
+  <div id="feedback"></div>
+  <div id="toast">¡NIVEL DESBLOQUEADO!</div>
+
+  <!-- HUD Superior -->
+  <div id="hud">
+    <div class="hud-top">
+      <span class="hud-title">AR QUEST 3D</span>
+      <button id="reiniciar">🔄 Reiniciar</button>
+    </div>
+
+    <div class="hud-stats">
+      <div class="stat-card">
+        <span class="stat-label">🕹️ Nivel</span>
+        <span class="stat-val c-cyan" id="txt-nivel">1/3</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">🪙 Puntos</span>
+        <span class="stat-val c-gold"><span id="txt-puntos">0</span>/<span id="txt-meta">50</span></span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">⏱️ Tiempo</span>
+        <span class="stat-val" id="txt-tiempo">60s</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">🏆 Récord</span>
+        <span class="stat-val c-gold" id="txt-record">0</span>
+      </div>
+    </div>
+
+    <div class="progress-bar">
+      <div class="progress-fill" id="progreso"></div>
+    </div>
+  </div>
+
+  <!-- CONTROLES TÁCTILES EN PANTALLA -->
+  <div id="controles-dpad">
+    <button class="btn-ctrl" id="btn-up">▲</button>
+    <button class="btn-ctrl" id="btn-left">◀</button>
+    <button class="btn-ctrl" id="btn-down">▼</button>
+    <button class="btn-ctrl" id="btn-right">▶</button>
+  </div>
+
+  <!-- Modal Victoria -->
+  <div id="modal-victoria" class="modal">
+    <div class="modal-box">
+      <div style="font-size: 50px;">🏆</div>
+      <h2 style="color: #FFD700; font-size: 22px;">¡VICTORIA ÉPICA!</h2>
+      <p style="font-size: 13px; color: #94A3B8;">¡Completaste con éxito los 3 niveles en Realidad Aumentada!</p>
+      <div style="font-size: 14px; margin: 4px 0;">Puntaje: <strong id="vic-puntos" style="color: #FFD700;">0</strong> | Récord: <strong id="vic-record" style="color: #00FFF5;">0</strong></div>
+      <button id="btn-vic-reiniciar" class="modal-btn">🔄 Jugar de Nuevo</button>
+    </div>
+  </div>
+
+  <!-- Modal Derrota -->
+  <div id="modal-derrota" class="modal">
+    <div class="modal-box" style="border-color: rgba(255, 51, 102, 0.4);">
+      <div style="font-size: 50px;">💥</div>
+      <h2 style="color: #FF3366; font-size: 22px;">¡GAME OVER!</h2>
+      <p style="font-size: 13px; color: #94A3B8;" id="derrota-desc">Has chocado contra un enemigo.</p>
+      <button id="btn-reintentar" class="modal-btn" style="background: linear-gradient(135deg, #FF3366, #E11D48); color: #FFF;">🔁 Reintentar Nivel</button>
+    </div>
+  </div>
+
+  <!-- Escena A-Frame y AR.js -->
+  <a-scene
+    embedded
+    vr-mode-ui="enabled: false"
+    arjs="sourceType: webcam; debugUIEnabled: false;"
+    renderer="logarithmicDepthBuffer: true; alpha: true; antialias: true;">
+
+    <a-assets timeout="10000">
+      <a-asset-item id="robot" src="robot.glb"></a-asset-item>
+    </a-assets>
+
+    <!-- Marcador Hiro -->
+    <a-marker preset="hiro" id="marcador" emitevents="true">
+      <!-- Base delimitadora decorativa -->
+      <a-ring position="0 0.02 0" rotation="-90 0 0" radius-inner="0.2" radius-outer="1.4" color="#00FFF5" opacity="0.3" material="transparent: true; side: double;"></a-ring>
+
+      <!-- Robot Principal Jugador -->
+      <a-entity
+id="robot-jugador"
+  gltf-model="#robot"
+  position="0 0.05 0"
+  scale="0.1 0.1 0.1"
+  rotation="0 0 0">
+      </a-entity>
+      <a-entity id="contenedor"></a-entity>
+    </a-marker>
+
+    <a-entity camera></a-entity>
+  </a-scene>
+
+  <script>
+    // Corrección automática del video de AR.js
+    function fixArVideo() {
+      const video = document.querySelector('video#arjs-video');
+      if (video) {
+        video.style.position = 'fixed';
+        video.style.top = '0px';
+        video.style.left = '0px';
+        video.style.width = '100vw';
+        video.style.height = '100vh';
+        video.style.objectFit = 'cover';
+        video.style.zIndex = '-10';
+        video.style.margin = '0px';
+      }
+    }
+    setInterval(fixArVideo, 300);
+
+    const NIVELES = {
+      1: { tiempo: 60, meta: 50, monedas: 4, enemigos: 2 },
+      2: { tiempo: 45, meta: 120, monedas: 5, enemigos: 3 },
+      3: { tiempo: 30, meta: 200, monedas: 6, enemigos: 4 }
+    };
+
+    let nivel = 1, puntos = 0, tiempo = 60, meta = 50, activo = true, timer = null;
+    let record = parseInt(localStorage.getItem('ar_quest_record')) || 0;
+
+    // Posición del Robot
+    let posRobot = { x: 0, z: 0 };
+    const PASO_MOVIMIENTO = 0.08;
+    const LIMITE_MAPA = 1.2;
+
+    const $ = id => document.getElementById(id);
+    const audioCoin = $('audio-coin');
+    const audioDamage = $('audio-damage');
+    const audioWin = $('audio-win');
+
+    function playSound(audio) {
+      if (!audio) return;
+      audio.currentTime = 0;
+      audio.play().catch(() => {});
+    }
+
+    // Movimiento del Robot y Control de Limites
+    function moverRobot(dx, dz, rotY) {
+      if (!activo) return;
+      const robotEl = $('robot-jugador');
+      if (!robotEl) return;
+
+      posRobot.x = Math.max(-LIMITE_MAPA, Math.min(LIMITE_MAPA, posRobot.x + dx));
+      posRobot.z = Math.max(-LIMITE_MAPA, Math.min(LIMITE_MAPA, posRobot.z + dz));
+
+      robotEl.setAttribute('position', `${posRobot.x.toFixed(2)} 0.1 ${posRobot.z.toFixed(2)}`);
+      robotEl.setAttribute('rotation', `0 ${rotY} 0`);
+
+      verificarColisiones();
+    }
+
+    $('btn-up').addEventListener('click', () => moverRobot(0, -PASO_MOVIMIENTO, 180));$('btn-down').addEventListener('click', () => moverRobot(0, PASO_MOVIMIENTO, 0));
+    $('btn-left').addEventListener('click', () => moverRobot(-PASO_MOVIMIENTO, 0, -90));$('btn-right').addEventListener('click', () => moverRobot(PASO_MOVIMIENTO, 0, 90));
+
+    // Soporte para teclado (para probar fácilmente en la PC)
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowUp' || e.key === 'w') moverRobot(0, -PASO_MOVIMIENTO, 180);
+      if (e.key === 'ArrowDown' || e.key === 's') moverRobot(0, PASO_MOVIMIENTO, 0);
+      if (e.key === 'ArrowLeft' || e.key === 'a') moverRobot(-PASO_MOVIMIENTO, 0, -90);
+      if (e.key === 'ArrowRight' || e.key === 'd') moverRobot(PASO_MOVIMIENTO, 0, 90);
+    });
+
+    // SISTEMA DE COLISIONES
+    // SISTEMA DE COLISIONES CON SONIDO DE ERROR
+function verificarColisiones() {
+  if (!activo) return;
+
+  // 1. Colisión con Monedas
+  const monedas = document.querySelectorAll('.moneda');
+  monedas.forEach(m => {
+    const p = m.getAttribute('position');
+    const dist = Math.hypot(posRobot.x - p.x, posRobot.z - p.z);
+
+    if (dist < 0.28) {
+      puntos += 10;
+      playSound(audioCoin);
+      popFeedback('+10', '#00E676');
+      if (m.parentNode) m.parentNode.removeChild(m);
+      spawn('moneda');
+      updateHUD();
+      checkMeta();
+    }
+  });
+
+  // 2. Colisión con Enemigos u Obstáculos -> Sonido de error + Game Over
+  const enemigos = document.querySelectorAll('.enemigo');
+  enemigos.forEach(e => {
+    const p = e.getAttribute('position');
+    const dist = Math.hypot(posRobot.x - p.x, posRobot.z - p.z);
+
+    if (dist < 0.28) {
+      activo = false;
+      clearInterval(timer);
+      
+      // Reproduce el sonido de error/daño de inmediato
+      playSound(audioDamage);
+      
+      flashDamage();
+      popFeedback('💥 ¡ERROR!', '#FF3366');
+      
+      // Pequeño retardo de 300ms para que se escuche bien el audio antes de abrir el modal
+      setTimeout(() => {
+        $('derrota-desc').textContent = `¡Chocaste contra un obstáculo en el Nivel ${nivel}!`;
+        $('modal-derrota').style.display = 'flex';
+      }, 300);
+    }
+  });
+}
+
+    function getPosAleatoria() {
+      const a = Math.random() * Math.PI * 2;
+      const r = 0.35 + Math.random() * 0.8;
+      return { x: (Math.cos(a) * r).toFixed(2), y: 0.15, z: (Math.sin(a) * r).toFixed(2) };
+    }
+
+    function spawn(tipo) {
+      const cont = $('contenedor');
+      if (!cont || !activo) return;
+      const p = getPosAleatoria();
+
+      if (tipo === 'moneda') {
+        const m = document.createElement('a-cylinder');
+        m.setAttribute('class', 'moneda');
+        m.setAttribute('position', `${p.x} ${p.y} ${p.z}`);
+        m.setAttribute('radius', '0.15');
+        m.setAttribute('height', '0.05');
+        m.setAttribute('color', '#FFD700');
+        m.setAttribute('material', 'metalness: 0.85; roughness: 0.25; emissive: #FFA000; emissiveIntensity: 0.35;');
+        m.setAttribute('rotation', '90 0 0');
+        m.setAttribute('animation__r', 'property: rotation; to: 90 360 0; loop: true; dur: 2000; easing: linear;');
+        cont.appendChild(m);
+      } else {
+        const e = document.createElement('a-box');
+        e.setAttribute('class', 'enemigo');
+        e.setAttribute('position', `${p.x} ${p.y} ${p.z}`);
+        e.setAttribute('width', '0.25');
+        e.setAttribute('height', '0.25');
+        e.setAttribute('depth', '0.25');
+        e.setAttribute('color', '#FF1744');
+        e.setAttribute('material', 'metalness: 0.6; roughness: 0.35; emissive: #D50000; emissiveIntensity: 0.45;');
+        e.setAttribute('animation__r', 'property: rotation; to: 360 360 0; loop: true; dur: 3000; easing: linear;');
+        cont.appendChild(e);
+      }
+    }
+
+    function poblar() {
+      const cont = $('contenedor');
+      while (cont.firstChild) cont.removeChild(cont.firstChild);
+      const cfg = NIVELES[nivel];
+      for (let i = 0; i < cfg.monedas; i++) spawn('moneda');
+      for (let j = 0; j < cfg.enemigos; j++) spawn('enemigo');
+    }
+
+    function updateHUD() {
+      $('txt-nivel').textContent = `${nivel}/3`;
+      $('txt-puntos').textContent = puntos;
+      $('txt-meta').textContent = meta;
+      $('txt-tiempo').textContent = `${tiempo}s`;
+      $('txt-tiempo').className = 'stat-val ' + (tiempo <= 10 ? 'c-red' : '');$('txt-record').textContent = record;
+
+      const prevMeta = nivel === 1 ? 0 : NIVELES[nivel - 1].meta;
+      const pct = Math.min(100, Math.max(0, ((puntos - prevMeta) / (meta - prevMeta)) * 100));
+      $('progreso').style.width = `${pct}%`;
+
+      if (puntos > record) {
+        record = puntos;
+        localStorage.setItem('ar_quest_record', record);
+        $('txt-record').textContent = record;
+      }
+    }
+
+    function flashDamage() {
+      const f = $('damage-flash');
+      f.classList.add('active');
+      setTimeout(() => f.classList.remove('active'), 200);
+    }
+
+    function popFeedback(txt, col) {
+      const fb = $('feedback');
+      fb.textContent = txt;
+      fb.style.color = col;
+      fb.style.opacity = '1';
+      fb.style.transform = 'translate(-50%, -75%) scale(1.2)';
+      setTimeout(() => { fb.style.opacity = '0'; fb.style.transform = 'translate(-50%, -50%) scale(0.9)'; }, 400);
+    }
+
+    function showToast(msg) {
+      const t = $('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 2500);
+    }
+
+    function checkMeta() {
+      if (puntos >= meta) {
+        if (nivel === 3) {
+          activo = false;
+          clearInterval(timer);
+          playSound(audioWin);
+          $('vic-puntos').textContent = puntos;
+          $('vic-record').textContent = record;
+          $('modal-victoria').style.display = 'flex';
+        } else {
+          nivel++;
+          tiempo = NIVELES[nivel].tiempo;
+          meta = NIVELES[nivel].meta;
+          playSound(audioCoin);
+          showToast(`🚀 ¡NIVEL ${nivel} DESBLOQUEADO! Meta: ${meta} pts`);
+          updateHUD();
+          poblar();
+        }
+      }
+    }
+
+    function startTimer() {
+      if (timer) clearInterval(timer);
+      timer = setInterval(() => {
+        if (!activo) return;
+        tiempo--;
+        updateHUD();
+        if (tiempo <= 0) {
+          activo = false;
+          clearInterval(timer);
+          playSound(audioDamage);
+          $('derrota-desc').textContent = `Se agotó el tiempo en el Nivel ${nivel}. Faltaron ${Math.max(0, meta - puntos)} pts.`;
+          $('modal-derrota').style.display = 'flex';
+        }
+      }, 1000);
+    }
+
+    function reiniciar(nivelObj = 1) {
+      nivel = nivelObj;
+      puntos = nivelObj === 1 ? 0 : NIVELES[nivelObj - 1].meta;
+      tiempo = NIVELES[nivel].tiempo;
+      meta = NIVELES[nivel].meta;
+      activo = true;
+      posRobot = { x: 0, z: 0 };
+
+      const robotEl = $('robot-jugador');
+      if (robotEl) {
+        robotEl.setAttribute('position', '0 0.1 0');
+        robotEl.setAttribute('rotation', '0 0 0');
+      }
+
+      $('modal-victoria').style.display = 'none';$('modal-derrota').style.display = 'none';
+      updateHUD();
+      poblar();
+      startTimer();
+    }
+
+    $('reiniciar').onclick = () => reiniciar(1);
+    $('btn-vic-reiniciar').onclick = () => reiniciar(1);$('btn-reintentar').onclick = () => reiniciar(nivel);
+
+    window.onload = () => {
+      reiniciar(1);
+    };
+  </script>
+
+</body>
+</html>
